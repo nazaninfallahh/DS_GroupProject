@@ -11,7 +11,6 @@ model = joblib.load("models/mental_health_model.joblib")
 
 links = pd.read_csv("links.csv", skiprows=1)
 
-# Remove the separator row from links.csv
 links = links[links["cntry"] != "---"]
 links = links.dropna(subset=["country"])
 
