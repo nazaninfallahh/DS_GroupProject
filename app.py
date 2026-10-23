@@ -47,16 +47,19 @@ st.divider()
 
 st.header("Your answers")
 
-
 generation = st.selectbox(
     "Which generation are you?",
-    ["Gen Z", "Millennial"]
+    ["Gen Z", "Millennial"],
+    index=None,
+    placeholder="Select an option"
 )
 
 
 country = st.selectbox(
     "Which country do you live in?",
-    sorted(links["country"].tolist())
+    sorted(links["country"].tolist()),
+    index=None,
+    placeholder="Select a country"
 )
 
 
@@ -64,8 +67,9 @@ internet_hours = st.number_input(
     "About how many hours per day do you use the internet?",
     min_value=0.0,
     max_value=24.0,
-    value=4.0,
-    step=0.5
+    value=None,
+    step=0.5,
+    placeholder="Enter hours"
 )
 
 
@@ -78,17 +82,20 @@ sleep_options = {
 
 sleep_answer = st.selectbox(
     "During the past week, how often was your sleep restless?",
-    list(sleep_options.keys())
+    list(sleep_options.keys()),
+    index=None,
+    placeholder="Select an option"
 )
 
 
-ctrlife = st.slider(
+ctrlife = st.selectbox(
     "How much control do you feel you have over your life?",
-    min_value=0,
-    max_value=10,
-    value=5,
-    help="0 = none, 10 = complete"
+    list(range(0, 11)),
+    index=None,
+    placeholder="Select a value from 0 to 10"
 )
+
+st.caption("0 = no control at all, 10 = complete control")
 
 
 health_options = {
@@ -101,7 +108,9 @@ health_options = {
 
 health_answer = st.selectbox(
     "How is your health in general?",
-    list(health_options.keys())
+    list(health_options.keys()),
+    index=None,
+    placeholder="Select an option"
 )
 
 
@@ -112,7 +121,9 @@ gender_options = {
 
 gender_answer = st.selectbox(
     "What is your gender assigned at birth?",
-    list(gender_options.keys())
+    list(gender_options.keys()),
+    index=None,
+    placeholder="Select an option"
 )
 
 
@@ -123,7 +134,9 @@ unemployment_options = {
 
 unemployment_answer = st.selectbox(
     "Have you ever been unemployed and seeking work for more than three months?",
-    list(unemployment_options.keys())
+    list(unemployment_options.keys()),
+    index=None,
+    placeholder="Select an option"
 )
 
 
@@ -139,9 +152,10 @@ support_options = {
 
 support_answer = st.selectbox(
     "How many people can you discuss intimate or personal matters with?",
-    list(support_options.keys())
+    list(support_options.keys()),
+    index=None,
+    placeholder="Select an option"
 )
-
 
 # -------------------------
 # Prediction
@@ -149,14 +163,41 @@ support_answer = st.selectbox(
 
 if st.button("See my result"):
 
+    required_answers = [
+        generation,
+        country,
+        internet_hours,
+        sleep_answer,
+        ctrlife,
+        health_answer,
+        gender_answer,
+        unemployment_answer,
+        support_answer
+    ]
+
+    if any(answer is None for answer in required_answers):
+        st.warning("Please answer all questions before viewing your result.")
+        st.stop()
+
     country_row = links[links["country"] == country]
 
     country_code = country_row["cntry"].iloc[0]
     resource_link = country_row["link"].iloc[0]
 
-    # Model uses minutes, not hours
     netustm = internet_hours * 60
 
+    # etc...
+
+    # Find country code and country-specific resource link
+    country_row = links[links["country"] == country]
+
+    country_code = country_row["cntry"].iloc[0]
+    resource_link = country_row["link"].iloc[0]
+
+    # ESS stores internet use in minutes
+    netustm = internet_hours * 60
+
+    # Build input in exactly the same format as the model training data
     user_data = pd.DataFrame(
         {
             "generation": [generation],
@@ -171,6 +212,7 @@ if st.button("See my result"):
         }
     )
 
+    # Prediction
     probability = model.predict_proba(user_data)[0][1]
     risk = probability * 100
 
@@ -182,17 +224,94 @@ if st.button("See my result"):
         f"{risk:.1f}%"
     )
 
-    st.write(
-        """
-        This percentage represents patterns found among people
-        with similar answers in the survey data. It does not
-        determine whether you have depression or any other
-        mental-health condition.
-        """
+    # Overall interpretation
+    if risk < 25:
+        st.success(
+            "People with similar answers had a relatively low "
+            "estimated likelihood of reporting depressive feelings."
+        )
+
+    elif risk <= 60:
+        st.warning(
+            "People with similar answers had a moderate "
+            "estimated likelihood of reporting depressive feelings."
+        )
+
+    else:
+        st.error(
+            "People with similar answers had a relatively high "
+            "estimated likelihood of reporting depressive feelings."
+        )
+
+    # Personalized information
+    st.subheader("Based on your answers")
+
+    personalized_feedback = False
+
+    if ctrlife < 6:
+        st.write(
+            "• You reported relatively low perceived control over your life. "
+            "In the survey data, lower perceived control was associated with "
+            "more frequent depressive feelings."
+        )
+        personalized_feedback = True
+
+    if sleep_options[sleep_answer] >= 2:
+        st.write(
+            "• You reported some level of restless sleep. Restless sleep "
+            "was one of the strongest factors associated with depressive "
+            "feelings in the model."
+        )
+        personalized_feedback = True
+
+    health_value = health_options[health_answer]
+
+    if health_value == 3:
+        st.write(
+            "• You rated your general health as fair. General health was "
+            "associated with depressive feelings in the survey data."
+        )
+        personalized_feedback = True
+
+    elif health_value >= 4:
+        st.write(
+            "• You rated your general health as bad or very bad. General "
+            "health was strongly associated with depressive feelings in "
+            "the survey data."
+        )
+        personalized_feedback = True
+
+    if not personalized_feedback:
+        st.write(
+            "Your answers did not trigger any of the additional factors "
+            "highlighted in this educational summary."
+        )
+
+    # Disclaimer
+    st.info(
+        "This result describes statistical patterns found in survey data. "
+        "It is not a diagnosis and cannot determine whether you have "
+        "depression or any other mental-health condition."
     )
 
+    # Resources
     st.subheader("Mental-health resources")
 
     st.markdown(
-        f"[View resources for {country}]({resource_link})"
+        f"[View mental-health resources for {country}]({resource_link})"
+    )
+
+    st.write(
+        "If you are concerned about your mental health, consider talking "
+        "to a qualified healthcare professional."
+    )
+
+    st.subheader("Additional educational resources")
+
+    st.markdown(
+        """
+        - [Mental Health Foundation](https://www.mentalhealth.org.uk/)
+        - [Mental Health First Aid International](https://mhfainternational.org/)
+        - [International Mental Health Association](https://imha.ngo/)
+        """
     )
