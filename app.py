@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import joblib
 
@@ -24,6 +25,36 @@ st.set_page_config(
     page_icon="🧠",
     layout="centered"
 )
+
+@st.dialog(" ")
+def html_popup():
+    with open("./article.html", "r", encoding="utf-8") as f:
+        raw_html = f.read()
+        
+    # The '*' applies the rule to all elements inside the body.
+    # '!important' overrides any existing colors in your HTML.
+    custom_css = """
+    <style>
+        body, body * { 
+            color: white !important; 
+        }
+        body {
+            background-color: #0e1117 !important; /* Streamlit's default dark mode color */
+        }
+    </style>
+    """
+    
+    html_data = f"{custom_css}\n{raw_html}"
+        
+    components.html(html_data, height=500, scrolling=True)
+    
+    if st.button("Close"):
+        st.session_state.html_popup_shown = True
+        st.rerun()
+
+if "html_popup_shown" not in st.session_state:
+    html_popup()
+
 
 st.title("Mental Well-being Quiz")
 
